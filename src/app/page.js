@@ -1,105 +1,176 @@
 'use client';
-import React, { useState, useEffect } from 'react';
-import NoteService from './axios';
 
-function NotesApp() {
+import { useEffect, useState } from 'react';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+export default function Home() {
   const [notes, setNotes] = useState([]);
-  const [newNote, setNewNote] = useState({ title: '', content: '' });
-  const [editNote, setEditNote] = useState(null);
+  const [newNoteTitle, setNewNoteTitle] = useState('');
+  const [newNoteContent, setNewNoteContent] = useState('');
+  const [editingNote, setEditingNote] = useState(null);
+  const [editingNoteTitle, setEditingNoteTitle] = useState('');
+  const [editingNoteContent, setEditingNoteContent] = useState('');
 
-  // Fetch all notes on component mount
   useEffect(() => {
     fetchNotes();
   }, []);
 
   const fetchNotes = async () => {
     try {
-      const notes = await NoteService.getAllNotes();
-      setNotes(notes);
+      const res = await fetch(`${API_URL}/notes`);
+      if (!res.ok) throw new Error(`Error: ${res.status}`);
+      const data = await res.json();
+      setNotes(data);
     } catch (error) {
       console.error('Error fetching notes:', error);
     }
   };
 
-  const handleCreateNote = async (e) => {
-    e.preventDefault();
+  const addNote = async () => {
+    // Proveri da li su oba polja popunjena
+    if (!newNoteTitle || !newNoteContent) return;
+
+    const noteData = {
+      title: newNoteTitle,
+      content: newNoteContent,
+    };
+
     try {
-      await NoteService.createNote(newNote);
-      setNewNote({ title: '', content: '' });
-      fetchNotes();
+      const res = await fetch(`${API_URL}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(noteData),
+      });
+      if (res.ok) {
+        setNewNoteTitle('');
+        setNewNoteContent('');
+        fetchNotes();
+      } else {
+        console.error('Greška prilikom kreiranja note-a:', res.status);
+      }
     } catch (error) {
       console.error('Error creating note:', error);
     }
   };
 
-  const handleUpdateNote = async (e) => {
-    e.preventDefault();
+  const deleteNote = async (id) => {
     try {
-      await NoteService.updateNote(editNote.id, editNote);
-      setEditNote(null);
-      fetchNotes();
-    } catch (error) {
-      console.error('Error updating note:', error);
-    }
-  };
-
-  const handleDeleteNote = async (id) => {
-    try {
-      await NoteService.deleteNote(id);
+      await fetch(`${API_URL}/notes/${id}`, { method: 'DELETE' });
       fetchNotes();
     } catch (error) {
       console.error('Error deleting note:', error);
     }
   };
 
-  return (
-    <div>
-      <h1>Notes App</h1>
+  const updateNote = async (id) => {
+    if (!editingNoteTitle || !editingNoteContent) return;
+    const updatedData = {
+      id,
+      title: editingNoteTitle,
+      content: editingNoteContent,
+    };
 
-      {/* Create/Edit Form */}
-      <form onSubmit={editNote ? handleUpdateNote : handleCreateNote}>
+    try {
+      const res = await fetch(`${API_URL}/notes/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedData),
+      });
+      if (res.ok) {
+        setEditingNote(null);
+        setEditingNoteTitle('');
+        setEditingNoteContent('');
+        fetchNotes();
+      } else {
+        console.error('Greška prilikom ažuriranja note-a:', res.status);
+      }
+    } catch (error) {
+      console.error('Error updating note:', error);
+    }
+  };
+
+  return (
+    <div className="max-w-xl mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Notes</h1>
+
+      {/* Forma za dodavanje nove beleške */}
+      <div className="mb-4">
         <input
-          type="text"
-          placeholder="Title"
-          value={editNote ? editNote.title : newNote.title}
-          onChange={(e) =>
-            editNote
-              ? setEditNote({ ...editNote, title: e.target.value })
-              : setNewNote({ ...newNote, title: e.target.value })
-          }
+          className="border p-2 mb-2 w-full"
+          value={newNoteTitle}
+          onChange={(e) => setNewNoteTitle(e.target.value)}
+          placeholder="New note title..."
         />
         <textarea
-          placeholder="Content"
-          value={editNote ? editNote.content : newNote.content}
-          onChange={(e) =>
-            editNote
-              ? setEditNote({ ...editNote, content: e.target.value })
-              : setNewNote({ ...newNote, content: e.target.value })
-          }
+          className="border p-2 mb-2 w-full"
+          value={newNoteContent}
+          onChange={(e) => setNewNoteContent(e.target.value)}
+          placeholder="New note content..."
         />
-        <button type="submit">
-          {editNote ? 'Update Note' : 'Create Note'}
+        <button className="p-2 bg-blue-500 text-white" onClick={addNote}>
+          Add Note
         </button>
-        {editNote && (
-          <button type="button" onClick={() => setEditNote(null)}>
-            Cancel Edit
-          </button>
-        )}
-      </form>
-
-      {/* Notes List */}
-      <div className="notes-list">
-        {notes.map((note) => (
-          <div key={note.id} className="note">
-            <h3>{note.title}</h3>
-            <p>{note.content}</p>
-            <button onClick={() => setEditNote(note)}>Edit</button>
-            <button onClick={() => handleDeleteNote(note.id)}>Delete</button>
-          </div>
-        ))}
       </div>
+
+      {/* Lista beleški */}
+      <ul>
+        {notes.map((note) => (
+          <li key={note.id} className="border p-2 mb-2">
+            {editingNote === note.id ? (
+              <div>
+                <input
+                  className="border p-1 mb-2 w-full"
+                  value={editingNoteTitle}
+                  onChange={(e) => setEditingNoteTitle(e.target.value)}
+                  placeholder="Edit note title"
+                />
+                <textarea
+                  className="border p-1 mb-2 w-full"
+                  value={editingNoteContent}
+                  onChange={(e) => setEditingNoteContent(e.target.value)}
+                  placeholder="Edit note content"
+                />
+                <button
+                  className="p-1 bg-green-500 text-white mr-2"
+                  onClick={() => updateNote(note.id)}
+                >
+                  Save
+                </button>
+                <button
+                  className="p-1 bg-gray-500 text-white"
+                  onClick={() => setEditingNote(null)}
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div>
+                <h2 className="font-bold">{note.title}</h2>
+                <p>{note.content}</p>
+                <div className="mt-2">
+                  <button
+                    className="p-1 bg-yellow-500 text-white mr-2"
+                    onClick={() => {
+                      setEditingNote(note.id);
+                      setEditingNoteTitle(note.title);
+                      setEditingNoteContent(note.content);
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="p-1 bg-red-500 text-white"
+                    onClick={() => deleteNote(note.id)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
-
-export default NotesApp;

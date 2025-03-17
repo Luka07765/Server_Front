@@ -15,6 +15,7 @@ export default function Home() {
   useEffect(() => {
     fetchNotes();
   }, []);
+  console.log('API URL:', API_URL);
 
   const fetchNotes = async () => {
     try {
